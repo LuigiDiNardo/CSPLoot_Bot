@@ -1,99 +1,211 @@
+import org.json.simple.parser.ParseException;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.xml.sax.SAXException;
 
-import javax.validation.constraints.Null;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.InputMismatchException;
 
 public class Handler extends TelegramLongPollingBot {
 
-    XMLManager xmlManager = XMLManager.getXMLManager();
+    private static final String[] KARMA_POSITIVE_TRIGGER_MESSAGES = {"+","up","UP","BASED","based","+1"};
+    private static final String[] KARMA_NEGATIVE_TRIGGER_MESSAGES = {"-","DOWN","CRINGE","down","cringe","-1"};
+    private XMLManager xmlManager;
+    private JSONManager jsonManager;
+
+    public Handler(){
+        xmlManager = XMLManager.getXMLManager();
+        jsonManager = JSONManager.getJSONManager();
+    }
+
     @Override
     public void onUpdateReceived(Update update) {
 
+            if(update.getMessage().isSuperGroupMessage()) {
 
-        if(update.getMessage().isSuperGroupMessage()){
-            String[] com = update.getMessage().getText().toLowerCase().split(" ");
+            long userId = update.getMessage().getFrom().getId();
+            String tag = update.getMessage().getFrom().getUserName();
+
+
+            try {
+                jsonManager.SaveUser(userId,tag,0);
+            } catch (IOException e) {
+                e.printStackTrace();
+                InviaMessaggio(update,"Impossibile recapitare il file *Utenti*");
+            } catch (SAXException | ParseException e) {
+                e.printStackTrace();
+                InviaMessaggio(update,e.getMessage());
+            }
+
+            if(update.getMessage().isReply()){
+                boolean trovato = false;
+                boolean stop = false;
+                for(String POSITIVE : Arrays.asList(KARMA_POSITIVE_TRIGGER_MESSAGES)){
+                    if(POSITIVE.equals(update.getMessage().getText())) {
+                        if (update.getMessage().getReplyToMessage().getFrom().getId() == userId) {
+                            stop = true;
+                        } else {
+                            try {
+                                jsonManager.UpdateKarma(update.getMessage().getReplyToMessage().getFrom().getId(), 1);
+                                InviaMessaggio(update, "*" + tag + "* hai dato +1 a *" + update.getMessage().getReplyToMessage().getFrom().getUserName() + "*");
+                            } catch (IOException e) {
+                                InviaMessaggio(update, "Impossibile aggiungere il karma, probabilmente il file non è reperibile o non esiste.");
+                                e.printStackTrace();
+                            } catch (ParseException e) {
+                                InviaMessaggio(update, e.getMessage());
+                                e.printStackTrace();
+                            }
+                            trovato = true;
+                            break;
+                        }
+                    }
+                }
+                if(!trovato){
+                    for(String NEGATIVE : Arrays.asList(KARMA_NEGATIVE_TRIGGER_MESSAGES)){
+                        if(NEGATIVE.equals(update.getMessage().getText())){
+                            if (update.getMessage().getReplyToMessage().getFrom().getId() == userId) {
+                                stop = true;
+                            }else {
+                                try {
+                                    jsonManager.UpdateKarma(update.getMessage().getReplyToMessage().getFrom().getId(), -1);
+                                    InviaMessaggio(update, "*" + tag + "* hai dato -1 a *" + update.getMessage().getReplyToMessage().getFrom().getUserName() + "*");
+                                } catch (IOException e) {
+                                    InviaMessaggio(update, "Impossibile aggiungere il karma, probabilmente il file non è reperibile o non esiste.");
+                                    e.printStackTrace();
+                                } catch (ParseException e) {
+                                    InviaMessaggio(update, e.getMessage());
+                                    e.printStackTrace();
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                if(stop){
+                    InviaMessaggio(update,"No, non credo te lo lascerò fare.");
+                }
+            }
+    }
+
+        if(update.getMessage().isCommand()){
+            StringBuilder firstPart = new StringBuilder();
+            if(update.getMessage().getText().contains("@")){
+                StringBuilder secondPart = new StringBuilder();
+                int index= update.getMessage().getText().indexOf("@");
+                firstPart.append(update.getMessage().getText(), 0, index);
+                secondPart.append(update.getMessage().getText().substring(index+12));
+                firstPart.append(secondPart.toString().toLowerCase());
+            } else {
+                firstPart.append(update.getMessage().getText().toLowerCase());
+            }
+            String[] com = firstPart.toString().split(" ");
             String risposta;
-            switch (com[0]){
+
+            switch (com[0]) {
                 case "/vocazioni":
-                    InviaMessaggio(update,"_https://telegra.ph/Lista-Vocazioni-di-Loot-01-26_");
+                    InviaMessaggio(update, "_https://telegra.ph/Lista-Vocazioni-di-Loot-01-26_");
                     break;
                 case "/artefatti":
                     try {
-                        risposta= xmlManager.ManageFileArtefatti();
+                        risposta = xmlManager.ManageFileArtefatti();
                         InviaMessaggio(update, risposta);
                     } catch (IOException e) {
-                        InviaMessaggio(update,"Errore nell'apertura del file *Artefatti.xml*");
+                        InviaMessaggio(update, "Errore nell'apertura del file *Artefatti.xml*");
                         e.printStackTrace();
                     } catch (ParserConfigurationException | SAXException e) {
-                        InviaMessaggio(update,e.getMessage());
-                        e.printStackTrace();
-                    } catch (InputMismatchException e){
-                        InviaMessaggio(update,"Puoi inserire un solo parametro per volta con questo comando!");
+                        InviaMessaggio(update, e.getMessage());
+                    e.printStackTrace();
+                    } catch (InputMismatchException e) {
+                        InviaMessaggio(update, "Puoi inserire un solo parametro per volta con questo comando!");
                         e.printStackTrace();
                     }
                     break;
                 case "/talismani":
-                    try{
-                        if(com.length == 1){
-                            risposta=xmlManager.ManageFileTalismani(null);
-                        }else if(com.length == 2){
-                            risposta=xmlManager.ManageFileTalismani(com[1]);
-                        }else{
-                            risposta="Non puoi inserire più di un parametro!";
+                    try {
+                        if (com.length == 1) {
+                            risposta = xmlManager.ManageFileTalismani(null);
+                        } else if (com.length == 2) {
+                            risposta = xmlManager.ManageFileTalismani(com[1]);
+                        } else {
+                            risposta = "Non puoi inserire più di un parametro!";
                         }
-                        InviaMessaggio(update,risposta);
+                        InviaMessaggio(update, risposta);
                     } catch (SAXException | ParserConfigurationException e) {
-                        InviaMessaggio(update,e.getMessage());
+                        InviaMessaggio(update, e.getMessage());
                         e.printStackTrace();
                     } catch (IOException e) {
-                        InviaMessaggio(update,"Errore nell'apertira del file *Talismani.xml*");
+                        InviaMessaggio(update, "Errore nell'apertira del file *Talismani.xml*");
                         e.printStackTrace();
-                    } catch(InputMismatchException e) {
+                    } catch (InputMismatchException e) {
                         InviaMessaggio(update, "Devi inserire un parametro valido per la ricerca!");
                         e.printStackTrace();
                     }
                     break;
-                case"/incarichi":
-                    try{
-                        if(com.length==1){
+                case "/incarichi":
+                    try {
+                        if (com.length == 1) {
                             risposta = xmlManager.ManageFileIncarichi(null);
-                            InviaMessaggio(update,risposta);
-                        }else if(com.length==2){
+                            InviaMessaggio(update, risposta);
+                        } else if (com.length == 2) {
                             risposta = xmlManager.ManageFileIncarichi(com[1]);
-                            InviaMessaggio(update,risposta);
-                        } else{
+                            InviaMessaggio(update, risposta);
+                        } else {
                             throw new InputMismatchException();
                         }
-
                     } catch (IOException e) {
-                        InviaMessaggio(update,"Impossibile reperire il file *Incarichi.xml*");
+                        InviaMessaggio(update, "Impossibile reperire il file *Incarichi.xml*");
+                        e.printStackTrace();
+                    } catch (ParserConfigurationException | SAXException e) {
+                        InviaMessaggio(update, e.getMessage());
+                        e.printStackTrace();
+                    } catch (InputMismatchException e) {
+                        InviaMessaggio(update, "Devi inserire solo una parola valida per la ricerca, tipo \"fame\" oppure \"formiche\"!\n Nel caso dei dungeon devi specificare quale ti interessa!");
+                        e.printStackTrace();
+                    }
+                    break;
+                case "/karma":
+                    if (!update.getMessage().isReply()) {
+                        try {
+                            risposta = jsonManager.KarmaRanking();
+                            InviaMessaggio(update, risposta);
+                        } catch (IOException e) {
+                            InviaMessaggio(update, "Impossibile analizzare il file con gli utenti!");
+                            e.printStackTrace();
+                        } catch (SAXException | ParseException e) {
+                            InviaMessaggio(update, e.getMessage());
+                            e.printStackTrace();
+                        }
+                    }
+                    break;
+                case "/help":
+                    try {
+                        InviaMessaggio(update,xmlManager.ShowHelpFile());
+                    } catch (IOException e) {
+                        InviaMessaggio(update,"Impossibile recuperare il file *Help.xml*");
                         e.printStackTrace();
                     } catch (ParserConfigurationException | SAXException e) {
                         InviaMessaggio(update,e.getMessage());
                         e.printStackTrace();
-                    }catch (InputMismatchException e){
-                        InviaMessaggio(update,"Devi inserire solo una parola valida per la ricerca, tipo \"fame\" oppure \"formiche\"!");
-                        e.printStackTrace();
                     }
-                default:break;
+                    break;
+                default:
+                    break;
             }
-
         }
     }
+
     @Override
     public String getBotUsername() {
-        return "CSPBot";
+        return "CornettoBot";
     }
 
     @Override
     public String getBotToken() {
-        return null;
+        return "";
     }
 
     public void InviaMessaggio(Update update, String mex){

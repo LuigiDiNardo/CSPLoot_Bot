@@ -1,13 +1,17 @@
 import org.w3c.dom.Document;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import java.io.*;
-
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.InputMismatchException;
+import java.util.Locale;
 
 public class XMLManager {
 
@@ -15,7 +19,6 @@ public class XMLManager {
 
 
     private XMLManager(){}
-
 
     public static XMLManager getXMLManager() throws NullPointerException {
         if(XMLMng == null){
@@ -27,15 +30,19 @@ public class XMLManager {
         }
     }
 
+    private Document getFile(String fileName) throws IOException, ParserConfigurationException, SAXException {
+        String path = "src/main/resources/"+fileName+"/"+fileName+".xml";
+        File file = new File(path);
+        InputStream is = new FileInputStream(file);
+        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder documentBuilder;
+        documentBuilder = documentBuilderFactory.newDocumentBuilder();
+        return documentBuilder.parse(is);
+    }
 
     public String ManageFileArtefatti() throws IOException, ParserConfigurationException, SAXException {
-            String risultato="";
-            File file = new File("src/main/resources/Artefatti/Artefatti.xml");
-            InputStream is = new FileInputStream(file);
-            DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder documentBuilder;
-            documentBuilder = documentBuilderFactory.newDocumentBuilder();
-            Document doc = documentBuilder.parse(is);
+            StringBuilder risultato= new StringBuilder();
+            Document doc=this.getFile("Artefatti");
             NodeList nameNode = doc.getElementsByTagName("nome");
             NodeList emojiNode = doc.getElementsByTagName("emoji");
             NodeList descrizioneNode = doc.getElementsByTagName("descrizione");
@@ -44,10 +51,10 @@ public class XMLManager {
                 nome=nameNode.item(i).getTextContent();
                 emoji=emojiNode.item(i).getTextContent();
                 descrizione=descrizioneNode.item(i).getTextContent().replace('^','\n');
-                risultato+=emoji+" "+nome+"\n"+descrizione+"\n";
+                risultato.append(emoji).append(" ").append(nome).append("\n").append(descrizione).append("\n");
             }
 
-            return risultato;
+            return risultato.toString();
     }
 
     public String ManageFileTalismani(String args)throws IOException, ParserConfigurationException, SAXException, InputMismatchException, NullPointerException {
@@ -57,12 +64,7 @@ public class XMLManager {
         StringBuilder descrizione = new StringBuilder();
         NodeList nomeNode, rinascitaNode, descrizioneNode;
 
-        File file = new File("src/main/resources/Talismani/Talismani.xml");
-        InputStream is = new FileInputStream(file);
-        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-        DocumentBuilder documentBuilder;
-        documentBuilder = documentBuilderFactory.newDocumentBuilder();
-        Document doc = documentBuilder.parse(is);
+        Document doc = this.getFile("Talismani");
 
         nomeNode = doc.getElementsByTagName("nome");
         rinascitaNode = doc.getElementsByTagName("rinascita");
@@ -97,7 +99,7 @@ public class XMLManager {
             } catch (NumberFormatException e) {
                 boolean found=false;
                 for (int i = 0; i < nomeNode.getLength(); i++) {
-                    if (descrizioneNode.item(i).getTextContent().contains(args)) {
+                    if (descrizioneNode.item(i).getTextContent().toLowerCase().contains(args.toLowerCase())) {
                         nome.append(nomeNode.item(i).getTextContent());
                         descrizione.append(descrizioneNode.item(i).getTextContent().replace('^','_'));
                         rinascita.append(rinascitaNode.item(i).getTextContent());
@@ -116,7 +118,7 @@ public class XMLManager {
         return risultato.toString();
     }
 
-    public String ManageFileIncarichi(String args)throws  IOException, ParserConfigurationException, SAXException, InputMismatchException, NullPointerException{
+    public String ManageFileIncarichi(String args)throws IOException, ParserConfigurationException, SAXException, InputMismatchException, NullPointerException{
         StringBuilder risultato = new StringBuilder();
         StringBuilder nome = new StringBuilder();
         StringBuilder scelta = new StringBuilder();
@@ -124,12 +126,7 @@ public class XMLManager {
         StringBuilder ricompensa = new StringBuilder();
         NodeList nomeNode, sceltaNode, requisitiNode, ricompensaNode;
 
-        File file = new File("src/main/resources/Incarichi/Incarichi.xml");
-        InputStream is = new FileInputStream(file);
-        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-        DocumentBuilder documentBuilder;
-        documentBuilder = documentBuilderFactory.newDocumentBuilder();
-        Document doc = documentBuilder.parse(is);
+        Document doc = this.getFile("Incarichi");
 
         nomeNode = doc.getElementsByTagName("nome");
         requisitiNode = doc.getElementsByTagName("requisiti");
@@ -144,24 +141,34 @@ public class XMLManager {
                 nome.delete(0, nome.length());
                 scelta.delete(0, scelta.length());
             }
-        } else{
-            int i=0;
-            boolean trovato=false;
-            while(i<nomeNode.getLength() && trovato==false){
-                if(nomeNode.item(i).getTextContent().contains(args)){
-                    nome.append(nomeNode.item(i).getTextContent());
-                    requisiti.append(requisitiNode.item(i).getTextContent().replace('^','\n'));
-                    scelta.append(sceltaNode.item(i).getTextContent());
-                    ricompensa.append(ricompensaNode.item(i).getTextContent().replace('^','\n'));
-                    trovato=true;
+        } else if(!args.toLowerCase().equals("dungeon")){
+            {
+                int i = 0;
+                boolean trovato = false;
+                while (i < nomeNode.getLength() && !trovato) {
+                    if (nomeNode.item(i).getTextContent().toLowerCase().contains(args.toLowerCase())) {
+                        nome.append(nomeNode.item(i).getTextContent());
+                        requisiti.append(requisitiNode.item(i).getTextContent().replace('^', '\n'));
+                        scelta.append(sceltaNode.item(i).getTextContent());
+                        ricompensa.append(ricompensaNode.item(i).getTextContent().replace('^', '\n'));
+                        trovato = true;
+                    }
+                    i++;
                 }
-                i++;
+                if (trovato)
+                    risultato.append(nome + "\n\n*Requisiti*:\n" + requisiti + "\n*Scelta*: " + scelta + "\n*Ricompense*:\n" + ricompensa);
+                else throw new NullPointerException();
             }
-            if(trovato) risultato.append(nome + "\n\n*Requisiti*:\n" + requisiti + "\n*Scelta*: " + scelta + "\n*Ricompense*:\n" + ricompensa);
-            else throw new NullPointerException();
         }
-
+        else throw new InputMismatchException();
 
         return risultato.toString();
+    }
+
+    public String ShowHelpFile() throws IOException, ParserConfigurationException, SAXException {
+        Document doc = this.getFile("Help");
+        Node stringa = doc.getElementsByTagName("string").item(0);
+        String output = stringa.getTextContent().replace('^','\n').replace('-','`');
+        return output;
     }
 }
