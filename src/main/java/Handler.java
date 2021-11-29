@@ -1,12 +1,14 @@
-import org.json.simple.parser.ParseException;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.xml.sax.SAXException;
+import persistence.DAO.UtenteDAO;
+import persistence.Entity.Utente;
 
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.InputMismatchException;
 
@@ -15,11 +17,11 @@ public class Handler extends TelegramLongPollingBot {
     private static final String[] KARMA_POSITIVE_TRIGGER_MESSAGES = {"+","up","UP","BASED","based","+1"};
     private static final String[] KARMA_NEGATIVE_TRIGGER_MESSAGES = {"-","DOWN","CRINGE","down","cringe","-1"};
     private XMLManager xmlManager;
-    private JSONManager jsonManager;
+    private UtenteDAO utenteDAO = null;
 
-    public Handler(){
+    public Handler() {
         xmlManager = XMLManager.getXMLManager();
-        jsonManager = JSONManager.getJSONManager();
+        utenteDAO = new UtenteDAO();
     }
 
     @Override
@@ -27,21 +29,19 @@ public class Handler extends TelegramLongPollingBot {
 
             if(update.getMessage().isSuperGroupMessage()) {
 
-            long userId = update.getMessage().getFrom().getId();
-            String tag = update.getMessage().getFrom().getUserName();
+                long userId = update.getMessage().getFrom().getId();
+                String tag = update.getMessage().getFrom().getUserName();
 
+                try {
+                    if(!utenteDAO.existsUtente(userId)){
+                        utenteDAO.addUtente(new Utente(userId,tag));
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    //InviaMessaggio(update, "Problema con la base di dati: salvataggio non riuscito!");
+                }
 
-            try {
-                jsonManager.SaveUser(userId,tag,0);
-            } catch (IOException e) {
-                e.printStackTrace();
-                InviaMessaggio(update,"Impossibile recapitare il file *Utenti*");
-            } catch (SAXException | ParseException e) {
-                e.printStackTrace();
-                InviaMessaggio(update,e.getMessage());
-            }
-
-            if(update.getMessage().isReply()){
+                if(update.getMessage().isReply()){
                 boolean trovato = false;
                 boolean stop = false;
                 for(String POSITIVE : Arrays.asList(KARMA_POSITIVE_TRIGGER_MESSAGES)){
@@ -50,14 +50,11 @@ public class Handler extends TelegramLongPollingBot {
                             stop = true;
                         } else {
                             try {
-                                jsonManager.UpdateKarma(update.getMessage().getReplyToMessage().getFrom().getId(), 1);
+                                utenteDAO.upgradeKarmaUtente(update.getMessage().getFrom().getId(),+1);
                                 InviaMessaggio(update, "*" + tag + "* hai dato +1 a *" + update.getMessage().getReplyToMessage().getFrom().getUserName() + "*");
-                            } catch (IOException e) {
-                                InviaMessaggio(update, "Impossibile aggiungere il karma, probabilmente il file non è reperibile o non esiste.");
+                            } catch (SQLException e) {
                                 e.printStackTrace();
-                            } catch (ParseException e) {
-                                InviaMessaggio(update, e.getMessage());
-                                e.printStackTrace();
+                                InviaMessaggio(update, "Impossibile aggiungere karma all'utente!");
                             }
                             trovato = true;
                             break;
@@ -71,14 +68,11 @@ public class Handler extends TelegramLongPollingBot {
                                 stop = true;
                             }else {
                                 try {
-                                    jsonManager.UpdateKarma(update.getMessage().getReplyToMessage().getFrom().getId(), -1);
+                                    utenteDAO.upgradeKarmaUtente(update.getMessage().getFrom().getId(),-1);
                                     InviaMessaggio(update, "*" + tag + "* hai dato -1 a *" + update.getMessage().getReplyToMessage().getFrom().getUserName() + "*");
-                                } catch (IOException e) {
-                                    InviaMessaggio(update, "Impossibile aggiungere il karma, probabilmente il file non è reperibile o non esiste.");
+                                } catch (SQLException e) {
                                     e.printStackTrace();
-                                } catch (ParseException e) {
-                                    InviaMessaggio(update, e.getMessage());
-                                    e.printStackTrace();
+                                    InviaMessaggio(update, "Impossibile rimuovere karma all'utente!");
                                 }
                                 break;
                             }
@@ -170,14 +164,10 @@ public class Handler extends TelegramLongPollingBot {
                 case "/karma":
                     if (!update.getMessage().isReply()) {
                         try {
-                            risposta = jsonManager.KarmaRanking();
-                            InviaMessaggio(update, risposta);
-                        } catch (IOException e) {
-                            InviaMessaggio(update, "Impossibile analizzare il file con gli utenti!");
+                            InviaMessaggio(update, utenteDAO.getKarmaRanking());
+                        } catch (SQLException e) {
                             e.printStackTrace();
-                        } catch (SAXException | ParseException e) {
-                            InviaMessaggio(update, e.getMessage());
-                            e.printStackTrace();
+                            InviaMessaggio(update, "Impossibile recapitare un rank del karma");
                         }
                     }
                     break;
@@ -205,7 +195,7 @@ public class Handler extends TelegramLongPollingBot {
 
     @Override
     public String getBotToken() {
-        return "";
+        return "xxx";
     }
 
     public void InviaMessaggio(Update update, String mex){

@@ -15,7 +15,7 @@ import java.util.Locale;
 
 public class XMLManager {
 
-    private static XMLManager XMLMng=null;
+    private static XMLManager XMLMng = null;
 
 
     private XMLManager(){}
