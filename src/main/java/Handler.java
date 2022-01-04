@@ -197,7 +197,7 @@ public class Handler extends TelegramLongPollingBot {
 
     @Override
     public String getBotToken() {
-        return "2059577671:AAEk6WNbFEz_WeNTctMoHWP43_1AT4Yk7ug";
+        return "xxx";
     }
 
     public void InviaMessaggio(Update update, String mex){
