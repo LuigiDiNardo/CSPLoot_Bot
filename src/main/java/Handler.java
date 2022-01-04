@@ -16,13 +16,10 @@ public class Handler extends TelegramLongPollingBot {
 
     private static final String[] KARMA_POSITIVE_TRIGGER_MESSAGES = {"+","up","UP","BASED","based","+1"};
     private static final String[] KARMA_NEGATIVE_TRIGGER_MESSAGES = {"-","DOWN","CRINGE","down","cringe","-1"};
-    private XMLManager xmlManager;
-    private UtenteDAO utenteDAO = null;
+    private static final XMLManager xmlManager = XMLManager.getXMLManager();
+    private static final UtenteDAO utenteDAO = new UtenteDAO(false);
 
-    public Handler() {
-        xmlManager = XMLManager.getXMLManager();
-        utenteDAO = new UtenteDAO();
-    }
+    public Handler() {}
 
     @Override
     public void onUpdateReceived(Update update) {
@@ -42,47 +39,8 @@ public class Handler extends TelegramLongPollingBot {
                 }
 
                 if(update.getMessage().isReply()){
-                boolean trovato = false;
-                boolean stop = false;
-                for(String POSITIVE : Arrays.asList(KARMA_POSITIVE_TRIGGER_MESSAGES)){
-                    if(POSITIVE.equals(update.getMessage().getText())) {
-                        if (update.getMessage().getReplyToMessage().getFrom().getId() == userId) {
-                            stop = true;
-                        } else {
-                            try {
-                                utenteDAO.upgradeKarmaUtente(update.getMessage().getFrom().getId(),+1);
-                                InviaMessaggio(update, "*" + tag + "* hai dato +1 a *" + update.getMessage().getReplyToMessage().getFrom().getUserName() + "*");
-                            } catch (SQLException e) {
-                                e.printStackTrace();
-                                InviaMessaggio(update, "Impossibile aggiungere karma all'utente!");
-                            }
-                            trovato = true;
-                            break;
-                        }
-                    }
+                    KarmaOperation(userId,tag,update);
                 }
-                if(!trovato){
-                    for(String NEGATIVE : Arrays.asList(KARMA_NEGATIVE_TRIGGER_MESSAGES)){
-                        if(NEGATIVE.equals(update.getMessage().getText())){
-                            if (update.getMessage().getReplyToMessage().getFrom().getId() == userId) {
-                                stop = true;
-                            }else {
-                                try {
-                                    utenteDAO.upgradeKarmaUtente(update.getMessage().getFrom().getId(),-1);
-                                    InviaMessaggio(update, "*" + tag + "* hai dato -1 a *" + update.getMessage().getReplyToMessage().getFrom().getUserName() + "*");
-                                } catch (SQLException e) {
-                                    e.printStackTrace();
-                                    InviaMessaggio(update, "Impossibile rimuovere karma all'utente!");
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-                if(stop){
-                    InviaMessaggio(update,"No, non credo te lo lascerò fare.");
-                }
-            }
     }
 
         if(update.getMessage().isCommand()){
@@ -188,6 +146,50 @@ public class Handler extends TelegramLongPollingBot {
         }
     }
 
+    private void KarmaOperation(long userId, String tag, Update update) {
+        boolean trovato = false;
+        boolean stop = false;
+        for(String POSITIVE : Arrays.asList(KARMA_POSITIVE_TRIGGER_MESSAGES)){
+            if(POSITIVE.equals(update.getMessage().getText())) {
+                if (update.getMessage().getReplyToMessage().getFrom().getId() == userId) {
+                    stop = true;
+                } else {
+                    try {
+                        utenteDAO.upgradeKarmaUtente(update.getMessage().getFrom().getId(),+1);
+                        InviaMessaggio(update, "*" + tag + "* hai dato +1 a *" + update.getMessage().getReplyToMessage().getFrom().getUserName() + "*");
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                        InviaMessaggio(update, "Impossibile aggiungere karma all'utente!");
+                    }
+                    trovato = true;
+                    break;
+                }
+            }
+        }
+        if(!trovato){
+            for(String NEGATIVE : Arrays.asList(KARMA_NEGATIVE_TRIGGER_MESSAGES)){
+                if(NEGATIVE.equals(update.getMessage().getText())){
+                    if (update.getMessage().getReplyToMessage().getFrom().getId() == userId) {
+                        stop = true;
+                    }else {
+                        try {
+                            utenteDAO.upgradeKarmaUtente(update.getMessage().getFrom().getId(),-1);
+                            InviaMessaggio(update, "*" + tag + "* hai dato -1 a *" + update.getMessage().getReplyToMessage().getFrom().getUserName() + "*");
+                        } catch (SQLException e) {
+                            e.printStackTrace();
+                            InviaMessaggio(update, "Impossibile rimuovere karma all'utente!");
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        if(stop){
+            InviaMessaggio(update,"No, non credo te lo lascerò fare.");
+        }
+
+    }
+
     @Override
     public String getBotUsername() {
         return "CornettoBot";
@@ -195,7 +197,7 @@ public class Handler extends TelegramLongPollingBot {
 
     @Override
     public String getBotToken() {
-        return "xxx";
+        return "2059577671:AAEk6WNbFEz_WeNTctMoHWP43_1AT4Yk7ug";
     }
 
     public void InviaMessaggio(Update update, String mex){

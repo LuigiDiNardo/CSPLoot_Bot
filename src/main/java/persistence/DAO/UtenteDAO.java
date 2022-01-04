@@ -4,21 +4,21 @@ import persistence.Entity.Utente;
 import Connection.*;
 
 import javax.validation.constraints.NotNull;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class UtenteDAO {
 
+    private boolean isTest;
     private Connection connection;
 
-    public UtenteDAO(){}
+    public UtenteDAO(boolean isTest){
+        this.isTest = isTest;
+    }
 
     public void addUtente(@NotNull Utente user) throws SQLException{
-        connection = ConnectionManager.getConnection();
+        connection = ConnectionManager.getConnection(this.isTest);
         String query = "INSERT INTO utenti values(?,?,?)";
         PreparedStatement preparedStatement = connection.prepareStatement(query);
         preparedStatement.setLong(1 ,user.getId());
@@ -29,7 +29,7 @@ public class UtenteDAO {
     }
 
     public boolean existsUtente(long id) throws SQLException {
-        connection = ConnectionManager.getConnection();
+        connection = ConnectionManager.getConnection(this.isTest);
         String query = "SELECT * FROM utenti WHERE id = ?";
         PreparedStatement preparedStatement = connection.prepareStatement(query);
         preparedStatement.setLong(1, id);
@@ -43,31 +43,47 @@ public class UtenteDAO {
     }
 
     public Utente findUtentebyId(long id) throws SQLException, NullPointerException{
-        connection = ConnectionManager.getConnection();
-        String query = "SELECT * FROM utenti WHERE id = ?";
-        PreparedStatement preparedStatement = connection.prepareStatement(query);
-        preparedStatement.setLong(1, id);
-        if(preparedStatement.executeQuery() == null){
+        if(!existsUtente(id)){
             throw new NullPointerException();
         } else {
-            Utente user = preparedStatement.getResultSet().unwrap(Utente.class);
+            connection = ConnectionManager.getConnection(this.isTest);
+            String query = "SELECT * FROM utenti WHERE id = ?";
+            PreparedStatement preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setLong(1, id);
+            ResultSet result = preparedStatement.executeQuery();
+            result.next();
+            Utente user = new Utente(result.getLong(1),result.getString(2));
             connection.close();
             return user;
         }
     }
 
     public void upgradeKarmaUtente(long id, int value) throws SQLException{
-        connection = ConnectionManager.getConnection();
-        String query = "UPDATE utente set karma = karma ? WHERE id = ?";
-        PreparedStatement preparedStatement = connection.prepareStatement(query);
-        preparedStatement.setInt(1, value);
-        preparedStatement.setLong(2,  id);
-        preparedStatement.executeUpdate();
-        connection.close();
+        if(existsUtente(id)) {
+            connection = ConnectionManager.getConnection(this.isTest);
+            String query = "UPDATE utenti set karma = karma + ? WHERE id = ?";
+            PreparedStatement preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setInt(1, value);
+            preparedStatement.setLong(2, id);
+            preparedStatement.executeUpdate();
+            connection.close();
+        }
+    }
+
+    public void clearAllData(){
+        try {
+            connection = ConnectionManager.getConnection(this.isTest);
+            String query ="DELETE FROM utenti";
+            Statement statement = connection.createStatement();
+            statement.execute(query);
+            connection.close();
+        } catch (SQLException e) {
+            System.out.println("Impossibile to use clearALLData() for testing for the following reason: \n\n" + e.getMessage());
+        }
     }
 
     public String getKarmaRanking() throws SQLException{
-        connection = ConnectionManager.getConnection();
+        connection = ConnectionManager.getConnection(this.isTest);
         String query = "SELECT tag,karma FROM utenti ORDER BY karma DESC";
         PreparedStatement preparedStatement = connection.prepareStatement(query);
         if(preparedStatement.executeQuery() == null){
